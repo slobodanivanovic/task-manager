@@ -1,14 +1,14 @@
-// src/app/page.tsx
+// src/app/page.tsx - FIXED VERSION WITH SAFETY CHECKS
 import { supabase } from "@/lib/supabase";
 import { CheckCircle, Clock, AlertCircle } from "lucide-react";
 
-// Define the Task interface (or import from supabase.ts)
+// Define the Task interface
 interface Task {
   id: number;
   title: string;
   description: string | null;
   completed: boolean;
-  priority: "low" | "medium" | "high";
+  priority: "low" | "medium" | "high" | null;
   created_at: string;
   updated_at: string;
 }
@@ -21,9 +21,14 @@ export default async function HomePage() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  // Helper function to get priority colors
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
+  // Helper function to get priority colors - WITH SAFETY CHECKS
+  const getPriorityColor = (priority: string | null | undefined) => {
+    // Safety check - handle null/undefined
+    if (!priority) {
+      return "bg-gray-100 text-gray-800 border-gray-200";
+    }
+
+    switch (priority.toLowerCase()) {
       case "high":
         return "bg-red-100 text-red-800 border-red-200";
       case "medium":
@@ -35,14 +40,35 @@ export default async function HomePage() {
     }
   };
 
-  // Helper function to format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  // Helper function to format priority text - WITH SAFETY CHECKS
+  const formatPriority = (priority: string | null | undefined) => {
+    if (!priority) return "None";
+    return priority.charAt(0).toUpperCase() + priority.slice(1);
   };
+
+  // Helper function to format date - WITH SAFETY CHECKS
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return "Unknown";
+
+    try {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch (error) {
+      return "Invalid Date";
+    }
+  };
+
+  // Safe task counting with null checks
+  const safeTaskCount = tasks?.length || 0;
+  const completedCount =
+    tasks?.filter((task) => task && task.completed === true).length || 0;
+  const pendingCount =
+    tasks?.filter((task) => task && task.completed === false).length || 0;
+  const highPriorityCount =
+    tasks?.filter((task) => task && task.priority === "high").length || 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -61,13 +87,13 @@ export default async function HomePage() {
             <div className="flex items-center space-x-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
-                  {tasks?.length || 0}
+                  {safeTaskCount}
                 </div>
                 <div className="text-sm text-gray-500">Total Tasks</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
-                  {tasks?.filter((task) => task.completed).length || 0}
+                  {completedCount}
                 </div>
                 <div className="text-sm text-gray-500">Completed</div>
               </div>
@@ -133,72 +159,76 @@ export default async function HomePage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {tasks.map((task: Task) => (
-                    <tr
-                      key={task.id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      {/* Status Column */}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {task.completed ? (
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <Clock className="h-5 w-5 text-yellow-500" />
-                          )}
-                          <span
-                            className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${
-                              task.completed
-                                ? "bg-green-100 text-green-800"
-                                : "bg-yellow-100 text-yellow-800"
-                            }`}
-                          >
-                            {task.completed ? "Done" : "Pending"}
-                          </span>
-                        </div>
-                      </td>
+                  {tasks.map((task: Task) => {
+                    // Safety check for each task
+                    if (!task) return null;
 
-                      {/* Task Column */}
-                      <td className="px-6 py-4">
-                        <div>
-                          <div
-                            className={`text-sm font-medium ${
-                              task.completed
-                                ? "text-gray-500 line-through"
-                                : "text-gray-900"
-                            }`}
-                          >
-                            {task.title}
+                    return (
+                      <tr
+                        key={task.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        {/* Status Column */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            {task.completed ? (
+                              <CheckCircle className="h-5 w-5 text-green-500" />
+                            ) : (
+                              <Clock className="h-5 w-5 text-yellow-500" />
+                            )}
+                            <span
+                              className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${
+                                task.completed
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-yellow-100 text-yellow-800"
+                              }`}
+                            >
+                              {task.completed ? "Done" : "Pending"}
+                            </span>
                           </div>
-                          {task.description && (
-                            <div className="text-sm text-gray-500 mt-1">
-                              {task.description}
+                        </td>
+
+                        {/* Task Column */}
+                        <td className="px-6 py-4">
+                          <div>
+                            <div
+                              className={`text-sm font-medium ${
+                                task.completed
+                                  ? "text-gray-500 line-through"
+                                  : "text-gray-900"
+                              }`}
+                            >
+                              {task.title || "Untitled Task"}
                             </div>
-                          )}
-                        </div>
-                      </td>
+                            {task.description && (
+                              <div className="text-sm text-gray-500 mt-1">
+                                {task.description}
+                              </div>
+                            )}
+                          </div>
+                        </td>
 
-                      {/* Priority Column */}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-3 py-1 text-xs font-medium rounded-full border ${getPriorityColor(task.priority)}`}
-                        >
-                          {task.priority.charAt(0).toUpperCase() +
-                            task.priority.slice(1)}
-                        </span>
-                      </td>
+                        {/* Priority Column - WITH SAFETY CHECKS */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`px-3 py-1 text-xs font-medium rounded-full border ${getPriorityColor(task.priority)}`}
+                          >
+                            {formatPriority(task.priority)}
+                          </span>
+                        </td>
 
-                      {/* Created Date Column */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(task.created_at)}
-                      </td>
+                        {/* Created Date Column */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(task.created_at)}
+                        </td>
 
-                      {/* ID Column */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-400">
-                        #{task.id}
-                      </td>
-                    </tr>
-                  ))}
+                        {/* ID Column */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-400">
+                          #{task.id || "N/A"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -218,7 +248,7 @@ export default async function HomePage() {
                     Pending Tasks
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {tasks.filter((task) => !task.completed).length}
+                    {pendingCount}
                   </p>
                 </div>
               </div>
@@ -232,7 +262,7 @@ export default async function HomePage() {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Completed</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {tasks.filter((task) => task.completed).length}
+                    {completedCount}
                   </p>
                 </div>
               </div>
@@ -248,7 +278,7 @@ export default async function HomePage() {
                     High Priority
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {tasks.filter((task) => task.priority === "high").length}
+                    {highPriorityCount}
                   </p>
                 </div>
               </div>
@@ -277,6 +307,10 @@ export default async function HomePage() {
             <li>
               • <strong>Global CDN:</strong> Served from the edge closest to
               your users
+            </li>
+            <li>
+              • <strong>Error Handling:</strong> Safe handling of null/undefined
+              database values
             </li>
           </ul>
         </div>
